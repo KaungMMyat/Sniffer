@@ -1,0 +1,195 @@
+================================================================================
+PYTHON PACKET SNIFFER - PROJECT SUMMARY
+================================================================================
+A desktop network packet sniffer and traffic monitor built with Python, Scapy
+and Flet, with a modular architecture designed for future security features.
+Last updated: 2026-10-14
+
+--------------------------------------------------------------------------------
+1. OVERVIEW
+--------------------------------------------------------------------------------
+This application captures live network traffic on a selected network interface
+and displays it in a real-time GUI. It supports capture filters (BPF syntax),
+display filters, per-packet detail inspection, and export to CSV and PCAP
+formats. The codebase is intentionally modular so that security analysis
+(port-scan detection, malicious-traffic detection) can be added as a separate
+subsystem without touching the capture or UI layers.
+
+--------------------------------------------------------------------------------
+2. FEATURES
+--------------------------------------------------------------------------------
+Capture
+  - Enumerate and select a physical network interface (virtual/Npcap/loopback
+    adapters are filtered out).
+  - Start / stop live capture with safe toggle behaviour (buttons enable and
+    disable correctly, no duplicate sniffer threads).
+  - Optional BPF capture filter (e.g. "tcp", "udp port 53", "host 8.8.8.8").
+
+Display
+  - Live packet table (capped at 500 displayed rows for performance).
+  - Colour-coded rows by protocol.
+  - Per-packet details panel (protocol, IPs, ports, MACs, length, info).
+  - Display filter by protocol, IP address, or port.
+
+Export
+  - CSV export of captured packet metadata.
+  - PCAP export of raw packets (openable in Wireshark).
+  - Format selected from a dropdown; native save-file dialog for location.
+  - Export is only allowed after capture has been stopped.
+
+--------------------------------------------------------------------------------
+3. ARCHITECTURE
+--------------------------------------------------------------------------------
+Layered design with clear separation of concerns:
+
+  UI layer (Flet)  ->  Controller  ->  Sniffer (Scapy)  ->  Parser  ->  Model
+                                              |
+                                        Exporters (CSV / PCAP)
+
+  - The capture backend is decoupled from the UI via the PacketInfo dataclass,
+    so the underlying engine (Scapy) could be swapped (e.g. PyShark) without
+    breaking the UI.
+  - Exporters share a common abstract base class, so new formats can be added
+    by creating one new file.
+
+--------------------------------------------------------------------------------
+4. FOLDER STRUCTURE
+--------------------------------------------------------------------------------
+Sniffer/
+├── app.py                  Application entry point; wires UI to logic.
+├── pyproject.toml          Project metadata and dependencies (uv).
+├── uv.lock                 Locked dependency versions.
+├── .gitignore              Ignored files (venv, embedded Python, artifacts).
+├── capture/                Packet capture subsystem.
+│   ├── interfaces.py       Lists valid network interfaces.
+│   ├── sniffer.py          Scapy AsyncSniffer wrapper (threaded capture).
+│   ├── parser.py           Raw Scapy packet -> PacketInfo conversion.
+│   └── controller.py       Mediator between sniffer and UI.
+├── models/
+│   └── packet_info.py      PacketInfo dataclass (the data contract).
+├── exporters/              Export subsystem (one file per format).
+│   ├── base.py             BaseExporter abstract interface.
+│   ├── csv_exporter.py     CSV export implementation.
+│   └── pcap_exporter.py    PCAP export implementation.
+├── ui/                     Flet user interface.
+│   ├── main_view.py        Main layout assembly.
+│   ├── packet_table.py     Packet row rendering.
+│   └── packet_details.py   Packet detail panel.
+└── utils/                  Shared helpers.
+    ├── packet_filter.py    Display-filter matching logic.
+    └── packet_color.py     Protocol -> colour mapping.
+
+--------------------------------------------------------------------------------
+5. MODULE DESCRIPTIONS
+--------------------------------------------------------------------------------
+capture/interfaces.py
+  Uses scapy.arch.windows.get_windows_if_list() and filters out virtual, QoS,
+  loopback and miniport adapters to present only real NICs.
+
+capture/sniffer.py
+  Wraps Scapy's AsyncSniffer. Runs capture on a background thread, guards
+  against double-start, and reports errors through a callback.
+
+capture/parser.py
+  Converts a raw Scapy packet into a PacketInfo object, extracting Ethernet,
+  IPv4/IPv6, ARP, TCP/UDP, ICMP and DNS fields. Protocol label is refined from
+  the most general layer to the most specific.
+
+capture/controller.py
+  Holds the sniffer instance and packet counter. On each packet it parses to
+  PacketInfo and forwards both the PacketInfo and the raw packet to the app.
+  Exposes is_running to let the UI know whether capture is active.
+
+models/packet_info.py
+  Dataclass holding: number, time, source, destination, protocol, length,
+  mac_source, mac_destination, src_port, dst_port, info.
+
+exporters/base.py
+  BaseExporter (ABC) requiring export(packets, file_path) -> int and
+  get_file_extension() -> str.
+
+exporters/csv_exporter.py
+  Writes packet metadata to a UTF-8 (BOM) CSV file.
+
+exporters/pcap_exporter.py
+  Writes raw Scapy packets to a .pcap file via scapy.wrpcap.
+
+ui/main_view.py
+  Builds the whole layout: interface dropdown, capture/display controls,
+  export controls, packet header, packet list and detail panel. Returns a dict
+  of named controls used by app.py.
+
+utils/packet_filter.py
+  Implements the display filter: matches protocol keywords (tcp/udp/icmp/arp/
+  dns/ipv4/ipv6) or substring matches against source, destination and ports.
+
+--------------------------------------------------------------------------------
+6. DATA FLOW
+--------------------------------------------------------------------------------
+1. User selects an interface and clicks Start Capture.
+2. app.py calls controller.start(interface, bpf_filter).
+3. Controller creates a PacketSniffer, which starts Scapy AsyncSniffer.
+4. Each captured packet -> controller.packet_received -> parse_packet -> PacketInfo.
+5. Controller forwards (PacketInfo, raw_packet) to the app callback.
+6. App appends to capture_packets (for display/CSV) and raw_packets (for PCAP),
+   renders a row on the UI thread, and refreshes the counter.
+7. On Stop, capture halts and the UI buttons reset.
+8. On Export, the app validates that capture is stopped, asks the user for a
+   location, and dispatches to the matching exporter.
+
+--------------------------------------------------------------------------------
+7. TECH STACK
+--------------------------------------------------------------------------------
+  - Python 3.14+
+  - Flet >= 0.86.3        (Flutter-based Python GUI)
+  - Scapy >= 2.7.0        (packet capture and parsing)
+  - psutil >= 7.2.2       (system/interface information)
+  - uv                    (dependency and environment management)
+
+--------------------------------------------------------------------------------
+8. HOW TO RUN
+--------------------------------------------------------------------------------
+Prerequisites
+  - Npcap installed (required by Scapy for packet capture on Windows).
+  - Run as Administrator (raw packet capture needs elevated privileges).
+
+Commands
+  uv sync                       Install dependencies.
+  uv run python app.py          Launch the application.
+  uv run python test_exporters.py   Run the exporter test suite.
+
+--------------------------------------------------------------------------------
+9. SECURITY FEATURES (ROADMAP / PLANNED)
+--------------------------------------------------------------------------------
+The next phase adds a dedicated security subsystem in a new top-level package
+(security/) so detection logic stays isolated from capture and UI code.
+
+Planned
+  - Port-scan detection: track TCP SYN attempts per source host within a time
+    window; raise an alert when one host probes many distinct ports/hosts.
+  - Malicious traffic pattern detection: extensible rule/detector framework
+    for suspicious behaviours beyond port scanning.
+  - Alert model: a SecurityAlert dataclass (timestamp, type, severity, source,
+    description) shared across detectors.
+  - Alert UI: a separate alerts window plus a live alert notice/banner on the
+    main window so the user is warned immediately.
+  - UI redesign toward a Wireshark-style layout (toolbar, filter bar, packet
+    list, detail pane) with an alerts panel integrated.
+
+Design principles
+  - Each detector implements a common interface (mirroring exporters/base.py).
+  - Detectors are pure functions of packet stream state -> easy to test.
+  - UI consumes alerts through a callback, keeping detection UI-agnostic.
+
+--------------------------------------------------------------------------------
+10. KNOWN CLEANUP ITEMS
+--------------------------------------------------------------------------------
+  - utils/exporter.py is the original CSV exporter and is now superseded by
+    exporters/csv_exporter.py. It is no longer used by app.py (only the old
+    test_exporter.py references it) and can be removed in a future cleanup.
+
+--------------------------------------------------------------------------------
+11. REPOSITORY
+--------------------------------------------------------------------------------
+  https://github.com/KaungMMyat/Sniffer
+================================================================================

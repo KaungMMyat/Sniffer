@@ -50,6 +50,22 @@ def create_main_view(
         color=ft.Colors.WHITE,
     )
 
+    export_format_dropdown = ft.Dropdown(
+        label="Export Format",
+        width=150,
+        dense=True,
+        options=[
+            ft.dropdown.Option(key="csv", text="CSV"),
+            ft.dropdown.Option(key="pcap", text="PCAP"),
+        ],
+        value="csv",
+    )
+
+    export_button = ft.Button(
+        "Export",
+        icon=ft.Icons.SAVE_ALT,
+    )
+
     capture_filter_field = ft.TextField(
         label="Capture Filter (BPF Syntax)",
         hint_text="e.g., tcp, udp port 53, host 8.8.8.8, tcp port 443",
@@ -105,6 +121,8 @@ def create_main_view(
                     filter_field,
                     apply_filter_button,
                     clear_button,
+                    export_format_dropdown,
+                    export_button,
                 ],
                 spacing=15,
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -140,4 +158,6 @@ def create_main_view(
         "apply_filter_button": apply_filter_button,
         "clear_button": clear_button,
         "capture_filter_field": capture_filter_field,
+        "export_format_dropdown": export_format_dropdown,
+        "export_button": export_button,
     }

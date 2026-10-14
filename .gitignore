@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Embedded / local Python runtime (large, machine-specific)
+Python/
+
+# Generated test / export artifacts
+test_packets.csv
+test_export.csv
+test_export.pcap

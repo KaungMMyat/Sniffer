@@ -36,13 +36,20 @@ class CaptureController:
 
     # -------------------------------------------------------
 
+    @property
+    def is_running(self):
+        """Check if capture is currently running."""
+        return self.sniffer and self.sniffer.running
+
+    # -------------------------------------------------------
+
     def packet_received(self, packet):
 
         self.packet_count += 1
 
         packet_info = parse_packet(packet, self.packet_count)
 
-        self.packet_callback(packet_info)
+        self.packet_callback(packet_info, packet)
 
     # -------------------------------------------------------
 
