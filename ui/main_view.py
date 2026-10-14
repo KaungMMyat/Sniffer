@@ -5,13 +5,23 @@ from ui.packet_details import create_packet_details
 from ui.packet_table import create_packet_header
 
 
-def _panel(content, expand=False):
+def _panel(content, expand=False, glass=True):
     return ft.Container(
-        bgcolor=theme.SURFACE,
-        border=ft.Border.all(1, theme.BORDER),
-        border_radius=10,
+        bgcolor=theme.GLASS_SURFACE if glass else theme.SURFACE,
+        blur=10 if glass else None,
+        border=ft.Border.all(
+            1, theme.GLASS_BORDER if glass else theme.BORDER
+        ),
+        border_radius=12,
         padding=16,
         expand=expand,
+        shadow=(
+            ft.BoxShadow(
+                blur_radius=18,
+                color="#1A163655",
+                offset=ft.Offset(0, 5),
+            ) if glass else None
+        ),
         content=content,
     )
 
@@ -51,11 +61,22 @@ def create_main_view(interfaces, start_capture, stop_capture):
     status_text = ft.Text("Ready" if interfaces else "No interface found",
                           size=12, weight=ft.FontWeight.W_600,
                           color=theme.MUTED if interfaces else theme.ERROR)
+    capture_activity = ft.ProgressRing(
+        width=12, height=12, stroke_width=2,
+        color=theme.SURFACE, visible=False,
+        semantics_label="Capturing network traffic",
+    )
     status_box = ft.Container(
         bgcolor=theme.BACKGROUND if interfaces else theme.ERROR_SOFT,
         border_radius=20,
         padding=ft.Padding.symmetric(horizontal=12, vertical=7),
-        content=status_text,
+        animate=ft.Animation(
+            theme.MOTION_STANDARD_MS, ft.AnimationCurve.EASE_OUT_CUBIC
+        ),
+        content=ft.Row(
+            tight=True, spacing=7,
+            controls=[capture_activity, status_text],
+        ),
     )
     status_message = ft.Text(
         "Choose an interface and start capture."
@@ -174,9 +195,20 @@ def create_main_view(interfaces, start_capture, stop_capture):
                     ),
                 ]),
                 expand=True,
+                glass=False,
             ),
             packet_details["view"],
         ],
+    )
+    layout = ft.Container(
+        expand=True,
+        padding=16,
+        gradient=ft.LinearGradient(
+            begin=ft.Alignment.TOP_LEFT,
+            end=ft.Alignment.BOTTOM_RIGHT,
+            colors=[theme.BACKGROUND_TOP, theme.BACKGROUND_BOTTOM],
+        ),
+        content=layout,
     )
 
     return {
@@ -186,6 +218,7 @@ def create_main_view(interfaces, start_capture, stop_capture):
         "start_button": start_button,
         "stop_button": stop_button,
         "status_text": status_text,
+        "capture_activity": capture_activity,
         "status_box": status_box,
         "status_message": status_message,
         "filter_field": filter_field,

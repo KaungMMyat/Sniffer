@@ -5,7 +5,7 @@ from capture.interfaces import get_interfaces
 from exporters import CSVExporter, PCAPExporter
 from ui import theme
 from ui.main_view import create_main_view
-from ui.packet_table import create_packet_row
+from ui.packet_table import create_packet_row, set_packet_row_selected
 from utils.packet_filter import matches_filter
 from utils.packet_view import packet_view
 
@@ -17,9 +17,10 @@ def main(page: ft.Page):
     page.title = "Packet Sniffer"
     page.window.width = 1280
     page.window.height = 880
-    page.padding = 16
+    page.padding = 0
     page.bgcolor = theme.BACKGROUND
     page.theme_mode = ft.ThemeMode.LIGHT
+    page.theme = ft.Theme(color_scheme_seed=theme.ACCENT)
 
     interfaces = get_interfaces()
     capture_packets = []
@@ -31,15 +32,16 @@ def main(page: ft.Page):
     def set_status(label, message, kind="neutral"):
         styles = {
             "neutral": (theme.BACKGROUND, theme.MUTED),
-            "live": (theme.SUCCESS_SOFT, theme.SUCCESS),
-            "error": (theme.ERROR_SOFT, theme.ERROR),
+            "live": (theme.SUCCESS, theme.SURFACE),
+            "error": (theme.ERROR, theme.SURFACE),
         }
         background, foreground = styles[kind]
         ui["status_box"].bgcolor = background
         ui["status_text"].value = label
         ui["status_text"].color = foreground
+        ui["capture_activity"].visible = kind == "live"
         ui["status_message"].value = message
-        ui["status_message"].color = foreground if kind == "error" else theme.MUTED
+        ui["status_message"].color = theme.ERROR if kind == "error" else theme.MUTED
 
     def update_actions():
         running = bool(controller.is_running)
@@ -108,9 +110,8 @@ def main(page: ft.Page):
         # Keep the selected row in view while the capture continues.
         ui["packet_list"].auto_scroll = False
         ui["follow_live_button"].disabled = False
-        _, visible = packet_view(capture_packets, active_filter,
-                                 MAX_DISPLAY_PACKETS)
-        render_packet_list(visible)
+        for row in ui["packet_list"].controls:
+            set_packet_row_selected(row, row.data["number"] == selected_packet_number)
         page.update()
 
     async def add_packet_to_table(packet_info, raw_packet):

@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import app
 from models.packet_info import PacketInfo
+from ui import theme
+from ui.packet_table import create_packet_row, set_packet_row_selected
 from utils.packet_view import packet_view
 
 
@@ -60,6 +62,18 @@ class FakeController:
 
 
 class PacketViewTests(unittest.TestCase):
+    def test_row_hover_and_selection_states(self):
+        row = create_packet_row(packet(1), lambda _: None)
+        with patch.object(row, "update"):
+            row.on_hover(SimpleNamespace(data=True))
+            self.assertEqual(row.bgcolor, theme.ROW_HOVER)
+            row.on_hover(SimpleNamespace(data=False))
+            self.assertEqual(row.bgcolor, theme.SURFACE)
+
+        set_packet_row_selected(row, True)
+        self.assertEqual(row.bgcolor, theme.ACCENT_SOFT)
+        self.assertEqual(row.border.left.color, theme.ACCENT)
+
     def test_filter_and_visible_limit(self):
         packets = [packet(i) for i in range(1, 503)] + [packet(503, "UDP")]
         count, visible = packet_view(packets, "tcp", limit=500)
@@ -76,6 +90,7 @@ class PacketViewTests(unittest.TestCase):
 
         ui["start_button"].on_click(None)
         self.assertEqual(ui["status_text"].value, "Capturing")
+        self.assertTrue(ui["capture_activity"].visible)
         FakeController.instance.packet_callback(packet(1), object())
         ui["filter_field"].value = "tcp"
         ui["apply_filter_button"].on_click(None)
@@ -85,15 +100,19 @@ class PacketViewTests(unittest.TestCase):
         self.assertEqual(len(ui["packet_list"].controls), 2)
         self.assertEqual(ui["packet_capture"].value,
                          "3 captured · 2 matching · 2 visible")
-        ui["packet_list"].controls[0].on_click(None)
+        selected_row = ui["packet_list"].controls[0]
+        selected_row.on_click(None)
         self.assertEqual(ui["packet_details"]["title"].value,
                          "Selected packet #1")
+        self.assertIs(ui["packet_list"].controls[0], selected_row)
+        self.assertEqual(selected_row.bgcolor, theme.ACCENT_SOFT)
         self.assertFalse(ui["packet_list"].auto_scroll)
 
         ui["clear_filter_button"].on_click(None)
         self.assertEqual(ui["packet_capture"].value,
                          "3 captured · 3 matching · 3 visible")
         ui["stop_button"].on_click(None)
+        self.assertFalse(ui["capture_activity"].visible)
         self.assertFalse(ui["export_button"].disabled)
         ui["clear_button"].on_click(None)
         self.assertEqual(ui["packet_capture"].value,

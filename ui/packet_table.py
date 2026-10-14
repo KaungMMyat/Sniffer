@@ -5,7 +5,7 @@ from ui import theme
 
 def create_packet_header():
     return ft.Container(
-        bgcolor=theme.BACKGROUND,
+        bgcolor=theme.TABLE_HEADER,
         padding=ft.Padding.symmetric(horizontal=12, vertical=10),
         border=ft.Border(bottom=ft.BorderSide(1, theme.BORDER)),
         content=ft.Row(
@@ -38,10 +38,16 @@ def create_packet_row(packet_info, on_click, selected=False):
     badge_bg, badge_fg = theme.protocol_style(packet_info.protocol)
     row = ft.Container(
         height=40,
-        bgcolor=theme.ACCENT_SOFT if selected else theme.SURFACE,
+        bgcolor=theme.SURFACE,
         padding=ft.Padding.symmetric(horizontal=12),
-        border=ft.Border(bottom=ft.BorderSide(1, theme.BORDER)),
+        animate=ft.Animation(theme.MOTION_FAST_MS, ft.AnimationCurve.EASE_OUT_CUBIC),
         ink=True,
+        data={
+            "number": packet_info.number,
+            "selected": selected,
+            "hovered": False,
+            "protocol_color": badge_bg,
+        },
         on_click=lambda e: on_click(packet_info),
         content=ft.Row(
             spacing=8,
@@ -55,7 +61,7 @@ def create_packet_row(packet_info, on_click, selected=False):
                     width=90,
                     content=ft.Container(
                         bgcolor=badge_bg,
-                        border_radius=6,
+                        border_radius=4,
                         padding=ft.Padding.symmetric(horizontal=7, vertical=4),
                         content=ft.Text(
                             packet_info.protocol,
@@ -71,16 +77,34 @@ def create_packet_row(packet_info, on_click, selected=False):
             ],
         ),
     )
+    _paint_row(row)
 
     def on_hover(e):
-        row.bgcolor = (
-            theme.ACCENT_SOFT if selected else
-            theme.ROW_HOVER if e.data == "true" else theme.SURFACE
-        )
+        row.data["hovered"] = bool(e.data)
+        _paint_row(row)
         row.update()
 
     row.on_hover = on_hover
     return row
+
+
+def set_packet_row_selected(row, selected):
+    row.data["selected"] = selected
+    _paint_row(row)
+
+
+def _paint_row(row):
+    selected = row.data["selected"]
+    row.bgcolor = (
+        theme.ACCENT_SOFT if selected else
+        theme.ROW_HOVER if row.data["hovered"] else theme.SURFACE
+    )
+    row.border = ft.Border(
+        left=ft.BorderSide(
+            3, theme.ACCENT if selected else row.data["protocol_color"]
+        ),
+        bottom=ft.BorderSide(1, theme.BORDER),
+    )
 
 
 def _cell(value, width=None, color=theme.TEXT, expand=False):

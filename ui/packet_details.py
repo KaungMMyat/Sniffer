@@ -59,10 +59,19 @@ def create_packet_details():
     )
 
     view = ft.Container(
-        bgcolor=theme.SURFACE,
-        border=ft.Border.all(1, theme.BORDER),
-        border_radius=10,
+        bgcolor=theme.GLASS_SURFACE,
+        blur=10,
+        border=ft.Border.all(1, theme.GLASS_BORDER),
+        border_radius=12,
         padding=16,
+        animate_size=ft.Animation(
+            theme.MOTION_STANDARD_MS, ft.AnimationCurve.EASE_OUT_CUBIC
+        ),
+        shadow=ft.BoxShadow(
+            blur_radius=18,
+            color="#1A163655",
+            offset=ft.Offset(0, 5),
+        ),
         content=ft.Column(
             spacing=12,
             controls=[title, empty, content],

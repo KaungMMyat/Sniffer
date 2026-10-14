@@ -27,11 +27,13 @@ Capture
 
 Display
   - Live packet table (latest 500 matching rows displayed for performance).
-  - Subtle protocol badges and selected-row highlighting.
+  - High-contrast protocol badges, coloured row markers and selected-row highlighting.
   - Per-packet details panel (protocol, IPs, ports, MACs, length, info).
   - Display filter by protocol, IP address, or port.
   - Capture status, empty states, separate captured/matching/visible counts,
     and a Follow live control when inspecting an older packet.
+  - Brief status, row-hover and detail-panel transitions; a small activity
+    indicator is visible only while capture is running.
 
 Export
   - CSV export of captured packet metadata.
