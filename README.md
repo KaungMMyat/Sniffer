@@ -32,6 +32,9 @@ adapter is available. The application currently targets Windows.
 5. Choose CSV or PCAP and select **Export**. CSV contains packet metadata;
    PCAP contains the original captured packets for tools such as Wireshark.
 
+Use the mode switch in the top-right header to change appearance.
+The choice is saved on this device for the next launch.
+
 The table displays the latest 500 matching packets. The counters distinguish
 the total captured packets, packets matching the display filter, and rows
 currently visible. Export includes the complete capture, not only visible

@@ -11,6 +11,7 @@ from utils.packet_view import packet_view
 
 
 MAX_DISPLAY_PACKETS = 500
+THEME_PREFERENCE_KEY = "sniffer.ui.dark_mode"
 
 
 def main(page: ft.Page):
@@ -21,19 +22,22 @@ def main(page: ft.Page):
     page.bgcolor = theme.BACKGROUND
     page.theme_mode = ft.ThemeMode.LIGHT
     page.theme = ft.Theme(color_scheme_seed=theme.ACCENT)
+    page.dark_theme = ft.Theme(color_scheme_seed=theme.ACCENT)
 
     interfaces = get_interfaces()
+    preferences = ft.SharedPreferences()
     capture_packets = []
     raw_packets = []
     active_filter = ""
     matching_count = 0
     selected_packet_number = None
+    theme_touched = False
 
     def set_status(label, message, kind="neutral"):
         styles = {
             "neutral": (theme.BACKGROUND, theme.MUTED),
-            "live": (theme.SUCCESS, theme.SURFACE),
-            "error": (theme.ERROR, theme.SURFACE),
+            "live": (theme.SUCCESS, theme.ON_COLOR),
+            "error": (theme.ERROR, theme.ON_COLOR),
         }
         background, foreground = styles[kind]
         ui["status_box"].bgcolor = background
@@ -41,7 +45,37 @@ def main(page: ft.Page):
         ui["status_text"].color = foreground
         ui["capture_activity"].visible = kind == "live"
         ui["status_message"].value = message
-        ui["status_message"].color = theme.ERROR if kind == "error" else theme.MUTED
+        ui["status_message"].color = (
+            ft.Colors.ERROR if kind == "error" else theme.MUTED
+        )
+
+    async def toggle_theme(e):
+        nonlocal theme_touched
+        theme_touched = True
+        is_dark = bool(e.control.value)
+        e.control.label = "Dark Mode" if is_dark else "Light Mode"
+        page.theme_mode = ft.ThemeMode.DARK if is_dark else ft.ThemeMode.LIGHT
+        page.update()
+        try:
+            await preferences.set(THEME_PREFERENCE_KEY, is_dark)
+        except Exception as error:
+            print(f"Could not save theme preference: {error}")
+
+    async def restore_theme():
+        try:
+            is_dark = await preferences.get(THEME_PREFERENCE_KEY)
+        except Exception as error:
+            print(f"Could not load theme preference: {error}")
+            return
+        if isinstance(is_dark, bool) and not theme_touched:
+            ui["theme_toggle"].value = is_dark
+            ui["theme_toggle"].label = (
+                "Dark Mode" if is_dark else "Light Mode"
+            )
+            page.theme_mode = (
+                ft.ThemeMode.DARK if is_dark else ft.ThemeMode.LIGHT
+            )
+            page.update()
 
     def update_actions():
         running = bool(controller.is_running)
@@ -254,7 +288,9 @@ def main(page: ft.Page):
         page.update()
 
     controller = CaptureController(packet_received, capture_error)
-    ui = create_main_view(interfaces, start_capture, stop_capture)
+    ui = create_main_view(
+        interfaces, start_capture, stop_capture, toggle_theme
+    )
     ui["apply_filter_button"].on_click = apply_display_filter
     ui["filter_field"].on_submit = apply_display_filter
     ui["clear_filter_button"].on_click = clear_display_filter
@@ -262,6 +298,7 @@ def main(page: ft.Page):
     ui["clear_button"].on_click = clear_packets
     ui["export_button"].on_click = export_packets
     page.add(ui["view"])
+    page.run_task(restore_theme)
     return ui
 
 

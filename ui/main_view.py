@@ -26,7 +26,7 @@ def _panel(content, expand=False, glass=True):
     )
 
 
-def create_main_view(interfaces, start_capture, stop_capture):
+def create_main_view(interfaces, start_capture, stop_capture, toggle_theme=None):
     interface_dropdown = ft.Dropdown(
         label="Network interface",
         width=300,
@@ -51,7 +51,7 @@ def create_main_view(interfaces, start_capture, stop_capture):
     start_button = ft.Button(
         "Start capture", icon=ft.Icons.PLAY_ARROW,
         on_click=start_capture, disabled=not interfaces,
-        bgcolor=theme.ACCENT, color=theme.SURFACE, elevation=0,
+        bgcolor=theme.ACCENT, color=theme.ON_COLOR, elevation=0,
     )
     stop_button = ft.Button(
         "Stop", icon=ft.Icons.STOP, on_click=stop_capture,
@@ -60,14 +60,14 @@ def create_main_view(interfaces, start_capture, stop_capture):
 
     status_text = ft.Text("Ready" if interfaces else "No interface found",
                           size=12, weight=ft.FontWeight.W_600,
-                          color=theme.MUTED if interfaces else theme.ERROR)
+                          color=theme.MUTED if interfaces else theme.ON_COLOR)
     capture_activity = ft.ProgressRing(
         width=12, height=12, stroke_width=2,
-        color=theme.SURFACE, visible=False,
+        color=theme.ON_COLOR, visible=False,
         semantics_label="Capturing network traffic",
     )
     status_box = ft.Container(
-        bgcolor=theme.BACKGROUND if interfaces else theme.ERROR_SOFT,
+        bgcolor=theme.BACKGROUND if interfaces else theme.ERROR,
         border_radius=20,
         padding=ft.Padding.symmetric(horizontal=12, vertical=7),
         animate=ft.Animation(
@@ -82,6 +82,12 @@ def create_main_view(interfaces, start_capture, stop_capture):
         "Choose an interface and start capture."
         if interfaces else "Install Npcap and check your network adapter, then restart the app.",
         size=12, color=theme.MUTED,
+    )
+    theme_toggle = ft.Switch(
+        label="Light Mode",
+        value=False,
+        active_color=theme.ACCENT,
+        on_change=toggle_theme,
     )
 
     filter_field = ft.TextField(
@@ -148,7 +154,10 @@ def create_main_view(interfaces, start_capture, stop_capture):
                         ft.Text("Live network traffic", size=12,
                                 color=theme.MUTED),
                     ]),
-                    status_box,
+                    ft.Row(
+                        tight=True, spacing=16,
+                        controls=[theme_toggle, status_box],
+                    ),
                 ],
             ),
             _panel(ft.Column(spacing=10, controls=[
@@ -220,6 +229,7 @@ def create_main_view(interfaces, start_capture, stop_capture):
         "status_text": status_text,
         "capture_activity": capture_activity,
         "status_box": status_box,
+        "theme_toggle": theme_toggle,
         "status_message": status_message,
         "filter_field": filter_field,
         "apply_filter_button": apply_filter_button,

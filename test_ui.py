@@ -35,8 +35,8 @@ class FakePage:
         pass
 
     def run_task(self, callback, *args):
-        # These app callbacks do not await I/O; drive them without opening a
-        # Windows event-loop socket in the test environment.
+        # Fake service calls complete immediately, so these coroutines can be
+        # driven without opening a Windows event-loop socket in this sandbox.
         coroutine = callback(*args)
         try:
             coroutine.send(None)
@@ -61,7 +61,20 @@ class FakeController:
         self.is_running = False
 
 
+class FakePreferences:
+    stored = None
+
+    async def get(self, key):
+        return self.stored
+
+    async def set(self, key, value):
+        self.__class__.stored = value
+
+
 class PacketViewTests(unittest.TestCase):
+    def setUp(self):
+        FakePreferences.stored = None
+
     def test_row_hover_and_selection_states(self):
         row = create_packet_row(packet(1), lambda _: None)
         with patch.object(row, "update"):
@@ -85,7 +98,8 @@ class PacketViewTests(unittest.TestCase):
     def test_live_filter_counts_and_selection(self):
         with patch.object(app, "get_interfaces", return_value=[
             {"name": "test0", "description": "Test adapter"}
-        ]), patch.object(app, "CaptureController", FakeController):
+        ]), patch.object(app, "CaptureController", FakeController), \
+                patch.object(app.ft, "SharedPreferences", FakePreferences):
             ui = app.main(FakePage())
 
         ui["start_button"].on_click(None)
@@ -119,6 +133,30 @@ class PacketViewTests(unittest.TestCase):
                          "0 captured · 0 matching · 0 visible")
         self.assertEqual(ui["packet_details"]["title"].value,
                          "No packet selected")
+
+    def test_theme_toggle_restores_preference_without_losing_packets(self):
+        FakePreferences.stored = True
+        page = FakePage()
+        with patch.object(app, "get_interfaces", return_value=[
+            {"name": "test0", "description": "Test adapter"}
+        ]), patch.object(app, "CaptureController", FakeController), \
+                patch.object(app.ft, "SharedPreferences", FakePreferences):
+            ui = app.main(page)
+
+        self.assertEqual(page.theme_mode, app.ft.ThemeMode.DARK)
+        self.assertTrue(ui["theme_toggle"].value)
+        self.assertEqual(ui["theme_toggle"].label, "Dark Mode")
+        FakeController.instance.packet_callback(packet(1), object())
+
+        ui["theme_toggle"].value = False
+        page.run_task(
+            ui["theme_toggle"].on_change,
+            SimpleNamespace(control=ui["theme_toggle"]),
+        )
+        self.assertEqual(page.theme_mode, app.ft.ThemeMode.LIGHT)
+        self.assertEqual(ui["theme_toggle"].label, "Light Mode")
+        self.assertFalse(FakePreferences.stored)
+        self.assertEqual(len(ui["packet_list"].controls), 1)
 
 
 if __name__ == "__main__":

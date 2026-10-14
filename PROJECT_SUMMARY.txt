@@ -34,6 +34,7 @@ Display
     and a Follow live control when inspecting an older packet.
   - Brief status, row-hover and detail-panel transitions; a small activity
     indicator is visible only while capture is running.
+  - Light/dark theme switch in the header with a saved local preference.
 
 Export
   - CSV export of captured packet metadata.
