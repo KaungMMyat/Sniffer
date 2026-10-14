@@ -26,10 +26,12 @@ Capture
   - Optional BPF capture filter (e.g. "tcp", "udp port 53", "host 8.8.8.8").
 
 Display
-  - Live packet table (capped at 500 displayed rows for performance).
-  - Colour-coded rows by protocol.
+  - Live packet table (latest 500 matching rows displayed for performance).
+  - Subtle protocol badges and selected-row highlighting.
   - Per-packet details panel (protocol, IPs, ports, MACs, length, info).
   - Display filter by protocol, IP address, or port.
+  - Capture status, empty states, separate captured/matching/visible counts,
+    and a Follow live control when inspecting an older packet.
 
 Export
   - CSV export of captured packet metadata.
@@ -115,9 +117,9 @@ exporters/pcap_exporter.py
   Writes raw Scapy packets to a .pcap file via scapy.wrpcap.
 
 ui/main_view.py
-  Builds the whole layout: interface dropdown, capture/display controls,
-  export controls, packet header, packet list and detail panel. Returns a dict
-  of named controls used by app.py.
+  Builds the desktop layout: capture toolbar, display-filter controls, packet
+  table, export actions and compact detail panel. Returns named controls used
+  by app.py. ui/theme.py contains shared visual tokens.
 
 utils/packet_filter.py
   Implements the display filter: matches protocol keywords (tcp/udp/icmp/arp/
@@ -173,8 +175,7 @@ Planned
     description) shared across detectors.
   - Alert UI: a separate alerts window plus a live alert notice/banner on the
     main window so the user is warned immediately.
-  - UI redesign toward a Wireshark-style layout (toolbar, filter bar, packet
-    list, detail pane) with an alerts panel integrated.
+  - Integrate alerts into the existing toolbar, packet list and detail layout.
 
 Design principles
   - Each detector implements a common interface (mirroring exporters/base.py).
@@ -187,6 +188,8 @@ Design principles
   - utils/exporter.py is the original CSV exporter and is now superseded by
     exporters/csv_exporter.py. It is no longer used by app.py (only the old
     test_exporter.py references it) and can be removed in a future cleanup.
+  - utils/packet_color.py is superseded by ui/theme.py for protocol badge
+    colours and is no longer used by the current UI.
 
 --------------------------------------------------------------------------------
 11. REPOSITORY

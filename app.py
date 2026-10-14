@@ -3,283 +3,266 @@ import flet as ft
 from capture.controller import CaptureController
 from capture.interfaces import get_interfaces
 from exporters import CSVExporter, PCAPExporter
+from ui import theme
 from ui.main_view import create_main_view
 from ui.packet_table import create_packet_row
 from utils.packet_filter import matches_filter
+from utils.packet_view import packet_view
+
+
+MAX_DISPLAY_PACKETS = 500
 
 
 def main(page: ft.Page):
-
-    page.title = "Python Packet Sniffer"
-
-    page.window.width = 1000
-    page.window.height = 900
-    page.padding = 20
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-
-    MAX_DISPLAY_PACKETS = 500
+    page.title = "Packet Sniffer"
+    page.window.width = 1280
+    page.window.height = 880
+    page.padding = 16
+    page.bgcolor = theme.BACKGROUND
+    page.theme_mode = ft.ThemeMode.LIGHT
 
     interfaces = get_interfaces()
+    capture_packets = []
+    raw_packets = []
+    active_filter = ""
+    matching_count = 0
+    selected_packet_number = None
 
-    ui = None
-    capture_packets = []  # store captured PacketInfo objects for display and CSV export
-    raw_packets = []  # store raw Scapy packets for PCAP export
-    # -------------------------------------------------------
+    def set_status(label, message, kind="neutral"):
+        styles = {
+            "neutral": (theme.BACKGROUND, theme.MUTED),
+            "live": (theme.SUCCESS_SOFT, theme.SUCCESS),
+            "error": (theme.ERROR_SOFT, theme.ERROR),
+        }
+        background, foreground = styles[kind]
+        ui["status_box"].bgcolor = background
+        ui["status_text"].value = label
+        ui["status_text"].color = foreground
+        ui["status_message"].value = message
+        ui["status_message"].color = foreground if kind == "error" else theme.MUTED
+
+    def update_actions():
+        running = bool(controller.is_running)
+        ui["start_button"].disabled = running or not interfaces
+        ui["stop_button"].disabled = not running
+        ui["interface_dropdown"].disabled = running
+        ui["capture_filter_field"].disabled = running
+        ui["clear_button"].disabled = running or not capture_packets
+        ui["export_button"].disabled = running or not capture_packets
+
+    def update_counts():
+        visible_count = len(ui["packet_list"].controls)
+        ui["packet_capture"].value = (
+            f"{len(capture_packets):,} captured · "
+            f"{matching_count:,} matching · {visible_count:,} visible"
+        )
+
+    def update_empty_state():
+        has_rows = bool(ui["packet_list"].controls)
+        ui["packet_list"].visible = has_rows
+        ui["empty_state"].visible = not has_rows
+        if not capture_packets:
+            ui["empty_title"].value = "No packets yet"
+            ui["empty_description"].value = (
+                "Start a capture to see network traffic here."
+            )
+        else:
+            ui["empty_title"].value = "No matching packets"
+            ui["empty_description"].value = (
+                "Try another display filter or clear the current filter."
+            )
+
+    def clear_selection():
+        nonlocal selected_packet_number
+        selected_packet_number = None
+        details = ui["packet_details"]
+        details["title"].value = "No packet selected"
+        details["empty"].visible = True
+        details["content"].visible = False
+
+    def render_packet_list(packets):
+        ui["packet_list"].controls = [
+            create_packet_row(
+                packet,
+                show_packet_details,
+                selected=packet.number == selected_packet_number,
+            )
+            for packet in packets
+        ]
+        update_empty_state()
+        update_counts()
 
     def show_packet_details(packet_info):
-
+        nonlocal selected_packet_number
+        selected_packet_number = packet_info.number
         details = ui["packet_details"]
+        details["title"].value = f"Selected packet #{packet_info.number}"
+        details["empty"].visible = False
+        details["content"].visible = True
+        for field in (
+            "protocol", "source", "destination", "src_port", "dst_port",
+            "mac_source", "mac_destination", "length", "info",
+        ):
+            details[field].value = str(getattr(packet_info, field) or "—")
 
-        details["protocol"].value = packet_info.protocol
-
-        details["source"].value = packet_info.source
-
-        details["destination"].value = packet_info.destination
-
-        details["src_port"].value = packet_info.src_port
-
-        details["dst_port"].value = packet_info.dst_port
-
-        details["mac_source"].value = packet_info.mac_source
-
-        details["mac_destination"].value = packet_info.mac_destination
-
-        details["length"].value = str(packet_info.length)
-
-        details["info"].value = packet_info.info
-
+        # Keep the selected row in view while the capture continues.
+        ui["packet_list"].auto_scroll = False
+        ui["follow_live_button"].disabled = False
+        _, visible = packet_view(capture_packets, active_filter,
+                                 MAX_DISPLAY_PACKETS)
+        render_packet_list(visible)
         page.update()
-
-    # -------------------------------------------------------
 
     async def add_packet_to_table(packet_info, raw_packet):
+        nonlocal matching_count
+        capture_packets.append(packet_info)
+        raw_packets.append(raw_packet)
 
-        capture_packets.append(packet_info)  # save packet information for display
-        raw_packets.append(raw_packet)  # save raw packet for PCAP export
-
-        if len(ui["packet_list"].controls) >= MAX_DISPLAY_PACKETS:
-            ui["packet_list"].controls.pop(0)
-
-        ui["packet_list"].controls.append(
-            create_packet_row(packet_info, show_packet_details)
-        )
-
-        ui["packet_capture"].value = f"Packets Captured: {packet_info.number}"
-
-        page.update()
-
-    # -------------------------------------------------------
-    def apply_display_filter(e=None):
-
-        filter_text = ui["filter_field"].value or ""
-
-        ui["packet_list"].controls.clear()  #  clear the current displayed packets
-
-        if not filter_text.strip():
-            packets_to_show = capture_packets
-        else:
-            packets_to_show = [
-                packet
-                for packet in capture_packets
-                if matches_filter(packet, filter_text)
-            ]
-
-        for packet_info in packets_to_show:
+        if matches_filter(packet_info, active_filter):
+            matching_count += 1
+            if len(ui["packet_list"].controls) >= MAX_DISPLAY_PACKETS:
+                ui["packet_list"].controls.pop(0)
             ui["packet_list"].controls.append(
-                create_packet_row(packet_info, show_packet_details)
+                create_packet_row(packet_info, show_packet_details,
+                                  selected=packet_info.number == selected_packet_number)
             )
 
-        ui["packet_capture"].value = (
-            f"Packets Captured: {len(packets_to_show)} | "
-            f"Showing: {len(packets_to_show)}"
+        update_empty_state()
+        update_counts()
+        update_actions()
+        page.update()
+
+    def apply_display_filter(e=None):
+        nonlocal active_filter, matching_count
+        active_filter = (ui["filter_field"].value or "").strip()
+        matching_count, visible = packet_view(
+            capture_packets, active_filter, MAX_DISPLAY_PACKETS
         )
-
+        if selected_packet_number not in {packet.number for packet in visible}:
+            clear_selection()
+        ui["filter_applied"].value = (
+            f"Active filter: {active_filter}"
+            if active_filter else "Showing all captured packets"
+        )
+        render_packet_list(visible)
         page.update()
 
-    # -------------------------------------------------------
+    def clear_display_filter(e=None):
+        ui["filter_field"].value = ""
+        apply_display_filter()
+
+    def follow_live(e=None):
+        ui["packet_list"].auto_scroll = True
+        ui["follow_live_button"].disabled = True
+        page.update()
+
     def clear_packets(e=None):
-
-        capture_packets.clear()  # clear the stored PacketInfo objects
-        raw_packets.clear()  # clear the stored raw packets
-
-        ui["packet_list"].controls.clear()  # clear the displayed packets
-
-        ui["packet_capture"].value = "Packets Captured: 0"  # reset the counter text
-
-        ui["filter_field"].value = ""  # clear the filter field
-
-        details = ui["packet_details"]
-        details["protocol"].value = "-"
-        details["source"].value = "-"
-        details["destination"].value = "-"
-        details["src_port"].value = "-"
-        details["dst_port"].value = "-"
-        details["mac_source"].value = "-"
-        details["mac_destination"].value = "-"
-        details["length"].value = "-"
-        details["info"].value = "-"
-
+        nonlocal active_filter, matching_count
+        if controller.is_running:
+            return
+        capture_packets.clear()
+        raw_packets.clear()
+        controller.packet_count = 0
+        active_filter = ""
+        matching_count = 0
+        ui["filter_field"].value = ""
+        ui["filter_applied"].value = "Showing all captured packets"
+        ui["packet_list"].controls.clear()
+        ui["packet_list"].auto_scroll = True
+        ui["follow_live_button"].disabled = True
+        clear_selection()
+        update_empty_state()
+        update_counts()
+        update_actions()
         page.update()
-
-    # -------------------------------------------------------
 
     async def export_packets(e):
-        # Check if capture is still running
-        if controller.is_running:
-            page.show_dialog(
-                ft.AlertDialog(
-                    title=ft.Text("Capture Running"),
-                    content=ft.Text(
-                        "Please stop the packet capture before exporting."
-                    ),
-                    actions=[
-                        ft.TextButton("OK", on_click=lambda _: page.pop_dialog())
-                    ],
-                )
-            )
-            return
-
-        if not capture_packets:
-            page.show_dialog(
-                ft.AlertDialog(
-                    title=ft.Text("No Packets"),
-                    content=ft.Text("There are no packets to export."),
-                    actions=[
-                        ft.TextButton("OK", on_click=lambda _: page.pop_dialog())
-                    ],
-                )
-            )
+        if controller.is_running or not capture_packets:
             return
 
         export_format = ui["export_format_dropdown"].value or "csv"
-
         try:
             file_path = await ft.FilePicker().save_file(
-                dialog_title="Save Packets As",
+                dialog_title="Save captured packets",
                 file_name=f"packets_export.{export_format}",
                 allowed_extensions=[export_format],
             )
-
             if not file_path:
                 return
 
             if export_format == "csv":
                 if not file_path.lower().endswith(".csv"):
                     file_path += ".csv"
-                exporter = CSVExporter()
-                count = exporter.export(capture_packets, file_path)
+                count = CSVExporter().export(capture_packets, file_path)
             elif export_format == "pcap":
                 if not file_path.lower().endswith(".pcap"):
                     file_path += ".pcap"
-                exporter = PCAPExporter()
-                count = exporter.export(raw_packets, file_path)
+                count = PCAPExporter().export(raw_packets, file_path)
             else:
                 raise ValueError(f"Unsupported export format: {export_format}")
 
-            page.show_dialog(
-                ft.AlertDialog(
-                    title=ft.Text("Export Successful"),
-                    content=ft.Text(
-                        f"Successfully exported {count} packets to:\n{file_path}"
-                    ),
-                    actions=[
-                        ft.TextButton(
-                            "OK", on_click=lambda _: page.pop_dialog()
-                        )
-                    ],
-                )
-            )
+            page.show_dialog(ft.AlertDialog(
+                title=ft.Text("Export complete"),
+                content=ft.Text(f"Saved {count} packets to:\n{file_path}"),
+                actions=[ft.TextButton("OK", on_click=lambda _: page.pop_dialog())],
+            ))
         except Exception as error:
-            page.show_dialog(
-                ft.AlertDialog(
-                    title=ft.Text("Export Failed"),
-                    content=ft.Text(f"Error exporting packets: {str(error)}"),
-                    actions=[
-                        ft.TextButton("OK", on_click=lambda _: page.pop_dialog())
-                    ],
-                )
-            )
+            page.show_dialog(ft.AlertDialog(
+                title=ft.Text("Export failed"),
+                content=ft.Text(str(error)),
+                actions=[ft.TextButton("OK", on_click=lambda _: page.pop_dialog())],
+            ))
 
     def packet_received(packet_info, raw_packet):
         page.run_task(add_packet_to_table, packet_info, raw_packet)
 
-    # -------------------------------------------------------
-
-    def start_capture(e):
-        try:
-            interface = ui["interface_dropdown"].value
-
-            if not interface:
-                print("Select interface first")
-                return
-
-            bpf_filter = ui["capture_filter_field"].value or None
-            if bpf_filter:
-                bpf_filter = bpf_filter.strip()
-            else:
-                bpf_filter = None
-
-            # Start capture through controller
-            controller.start(interface, bpf_filter=bpf_filter)
-
-            ui["start_button"].disabled = True
-            ui["stop_button"].disabled = False
-
-            if bpf_filter:
-                print(f"Capture started on {interface} with filter: {bpf_filter}")
-            else:
-                print(f"Capture started on {interface} with no filter")
-            page.update()
-
-            print("Capture started")
-        except Exception as error:
-            print(f"Error starting capture: {error}")
-            # Reset UI state on error
-            ui["start_button"].disabled = False
-            ui["stop_button"].disabled = True
-            page.update()
-
-    # -------------------------------------------------------
-
-    def stop_capture(e):
-        try:
-            # Stop capture through controller
-            controller.stop()
-
-            ui["start_button"].disabled = False
-            ui["stop_button"].disabled = True
-
-            page.update()
-
-            print("Capture stopped")
-        except Exception as error:
-            print(f"Error stopping capture: {error}")
-            # Still update UI even if there's an error
-            ui["start_button"].disabled = False
-            ui["stop_button"].disabled = True
-            page.update()
-
-    # -------------------------------------------------------
+    async def show_capture_error(error):
+        set_status("Capture error", str(error), "error")
+        update_actions()
+        page.update()
 
     def capture_error(error):
+        page.run_task(show_capture_error, error)
 
-        print(f"Capture Error: {error}")
+    def start_capture(e=None):
+        interface = ui["interface_dropdown"].value
+        if not interface:
+            set_status("Select an interface", "Choose a network interface first.",
+                       "error")
+            page.update()
+            return
 
-    # -------------------------------------------------------
+        bpf_filter = (ui["capture_filter_field"].value or "").strip() or None
+        try:
+            controller.start(interface, bpf_filter=bpf_filter)
+            if not controller.is_running:
+                raise RuntimeError("Capture could not start. Check Npcap and permissions.")
+            set_status("Capturing", f"Listening on {interface}", "live")
+        except Exception as error:
+            set_status("Capture error", str(error), "error")
+        update_actions()
+        page.update()
 
-    controller = CaptureController(packet_received)
+    def stop_capture(e=None):
+        try:
+            controller.stop()
+            set_status("Stopped", "Capture stopped. You can export or clear packets.")
+        except Exception as error:
+            set_status("Capture error", str(error), "error")
+        update_actions()
+        page.update()
 
-    ui = create_main_view(  # 1. main_view ကနေပြီး UI ကိုယူလိုက်ပြီ
-        interfaces,
-        start_capture,  # main_view စီကို app.py  ထဲက start/stop capture function passing ပေးလိုက်ပြီ
-        stop_capture,
-    )
-    # Connect the Apply Filter button
+    controller = CaptureController(packet_received, capture_error)
+    ui = create_main_view(interfaces, start_capture, stop_capture)
     ui["apply_filter_button"].on_click = apply_display_filter
+    ui["filter_field"].on_submit = apply_display_filter
+    ui["clear_filter_button"].on_click = clear_display_filter
+    ui["follow_live_button"].on_click = follow_live
     ui["clear_button"].on_click = clear_packets
     ui["export_button"].on_click = export_packets
-
     page.add(ui["view"])
+    return ui
 
 
-ft.run(main)
+if __name__ == "__main__":
+    ft.run(main)

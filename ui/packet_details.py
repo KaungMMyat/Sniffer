@@ -1,95 +1,72 @@
 import flet as ft
 
+from ui import theme
 
-def create_packet_details():
 
-    protocol = ft.Text("-")
-    source = ft.Text("-")
-    destination = ft.Text("-")
-
-    src_port = ft.Text("-")
-    dst_port = ft.Text("-")
-
-    mac_source = ft.Text("-")
-    mac_destination = ft.Text("-")
-
-    length = ft.Text("-")
-    info = ft.Text("-")
-
-    details_view = ft.Column(
+def _detail(label, value):
+    return ft.Row(
+        spacing=8,
         controls=[
-            ft.Text(
-                "Packet Details",
-                size=18,
-                weight=ft.FontWeight.BOLD,
-            ),
-            ft.Divider(),
-            ft.Row(
-                controls=[
-                    ft.Text("Protocol", width=140),
-                    protocol,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Source", width=140),
-                    source,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Destination", width=140),
-                    destination,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Source Port", width=140),
-                    src_port,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Destination Port", width=140),
-                    dst_port,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Source MAC", width=140),
-                    mac_source,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Destination MAC", width=140),
-                    mac_destination,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Length", width=140),
-                    length,
-                ]
-            ),
-            ft.Row(
-                controls=[
-                    ft.Text("Info", width=140),
-                    info,
-                ]
-            ),
-        ]
+            ft.Text(label, width=112, size=12, color=theme.MUTED),
+            value,
+        ],
     )
 
-    return {
-        "view": details_view,
-        "protocol": protocol,
-        "source": source,
-        "destination": destination,
-        "src_port": src_port,
-        "dst_port": dst_port,
-        "mac_source": mac_source,
-        "mac_destination": mac_destination,
-        "length": length,
-        "info": info,
+
+def create_packet_details():
+    fields = {
+        name: ft.Text("—", size=12, color=theme.TEXT, selectable=True)
+        for name in (
+            "protocol", "source", "destination", "src_port", "dst_port",
+            "mac_source", "mac_destination", "length", "info",
+        )
     }
+    title = ft.Text("No packet selected", size=14, weight=ft.FontWeight.W_600,
+                    color=theme.TEXT)
+    empty = ft.Text("Select a row above to inspect its details.",
+                    size=12, color=theme.MUTED)
+    content = ft.Column(
+        visible=False,
+        spacing=8,
+        controls=[
+            ft.Row(
+                spacing=24,
+                controls=[
+                    ft.Column(
+                        expand=True,
+                        spacing=6,
+                        controls=[
+                            _detail("Protocol", fields["protocol"]),
+                            _detail("Source", fields["source"]),
+                            _detail("Destination", fields["destination"]),
+                            _detail("Length", fields["length"]),
+                        ],
+                    ),
+                    ft.Column(
+                        expand=True,
+                        spacing=6,
+                        controls=[
+                            _detail("Source port", fields["src_port"]),
+                            _detail("Destination port", fields["dst_port"]),
+                            _detail("Source MAC", fields["mac_source"]),
+                            _detail("Destination MAC", fields["mac_destination"]),
+                        ],
+                    ),
+                ],
+            ),
+            _detail("Info", fields["info"]),
+        ],
+    )
+
+    view = ft.Container(
+        bgcolor=theme.SURFACE,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=10,
+        padding=16,
+        content=ft.Column(
+            spacing=12,
+            controls=[title, empty, content],
+        ),
+    )
+    return {"view": view, "title": title, "empty": empty,
+            "content": content, **fields}
