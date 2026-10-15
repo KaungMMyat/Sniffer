@@ -24,6 +24,8 @@ def main(page: ft.Page):
     page.title = "Packet Sniffer"
     page.window.width = 1280
     page.window.height = 880
+    page.window.min_width = 720
+    page.window.min_height = 650
     page.padding = 0
     page.bgcolor = theme.BACKGROUND
     page.theme_mode = ft.ThemeMode.LIGHT
@@ -53,6 +55,7 @@ def main(page: ft.Page):
         ui["status_text"].color = foreground
         ui["capture_activity"].visible = kind == "live"
         ui["status_message"].value = message
+        ui["status_message"].visible = True
         ui["status_message"].color = (
             ft.Colors.ERROR if kind == "error" else theme.MUTED
         )
@@ -169,6 +172,7 @@ def main(page: ft.Page):
         panel["alert_count"].value = str(len(security_engine.alerts))
         panel["empty_text"].visible = False
         panel["clear_button"].disabled = False
+        panel["clear_button"].visible = True
 
     def process_pending():
         """Drain queued packets/alerts and redraw the UI once.
@@ -301,6 +305,7 @@ def main(page: ft.Page):
         panel["alert_count"].value = "0"
         panel["empty_text"].visible = True
         panel["clear_button"].disabled = True
+        panel["clear_button"].visible = False
 
     def security_alert_received(alert):
         print(
@@ -364,6 +369,8 @@ def main(page: ft.Page):
     ui = create_main_view(
         interfaces, start_capture, stop_capture, toggle_theme
     )
+    # Also lets headless checks drain the same batch the UI timer drains.
+    ui["_flush_pending"] = process_pending
     ui["apply_filter_button"].on_click = apply_display_filter
     ui["filter_field"].on_submit = apply_display_filter
     ui["clear_filter_button"].on_click = clear_display_filter

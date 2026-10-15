@@ -15,7 +15,8 @@ def _detail(label, value):
 
 def create_packet_details():
     fields = {
-        name: ft.Text("—", size=12, color=theme.TEXT, selectable=True)
+        name: ft.Text("—", size=12, color=theme.TEXT,
+                      selectable=True, expand=True)
         for name in (
             "protocol", "source", "destination", "src_port", "dst_port",
             "mac_source", "mac_destination", "length", "info",
@@ -59,22 +60,19 @@ def create_packet_details():
     )
 
     view = ft.Container(
-        bgcolor=theme.GLASS_SURFACE,
-        blur=10,
-        border=ft.Border.all(1, theme.GLASS_BORDER),
-        border_radius=12,
-        padding=16,
+        bgcolor=theme.SURFACE,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=8,
+        padding=12,
         animate_size=ft.Animation(
             theme.MOTION_STANDARD_MS, ft.AnimationCurve.EASE_OUT_CUBIC
         ),
-        shadow=ft.BoxShadow(
-            blur_radius=18,
-            color="#1A163655",
-            offset=ft.Offset(0, 5),
-        ),
         content=ft.Column(
-            spacing=12,
-            controls=[title, empty, content],
+            spacing=10,
+            controls=[
+                ft.Row(spacing=12, wrap=True, controls=[title, empty]),
+                content,
+            ],
         ),
     )
     return {"view": view, "title": title, "empty": empty,

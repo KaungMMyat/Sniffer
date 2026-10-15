@@ -37,6 +37,8 @@ class FakePage:
     def run_task(self, callback, *args):
         # Fake service calls complete immediately, so these coroutines can be
         # driven without opening a Windows event-loop socket in this sandbox.
+        if callback.__name__ == "ui_flush_loop":
+            return
         coroutine = callback(*args)
         try:
             coroutine.send(None)
@@ -105,11 +107,14 @@ class PacketViewTests(unittest.TestCase):
         ui["start_button"].on_click(None)
         self.assertEqual(ui["status_text"].value, "Capturing")
         self.assertTrue(ui["capture_activity"].visible)
+        self.assertFalse(ui["packet_details"]["content"].visible)
         FakeController.instance.packet_callback(packet(1), object())
+        ui["_flush_pending"]()
         ui["filter_field"].value = "tcp"
         ui["apply_filter_button"].on_click(None)
         FakeController.instance.packet_callback(packet(2, "UDP"), object())
         FakeController.instance.packet_callback(packet(3), object())
+        ui["_flush_pending"]()
 
         self.assertEqual(len(ui["packet_list"].controls), 2)
         self.assertEqual(ui["packet_capture"].value,
@@ -121,6 +126,7 @@ class PacketViewTests(unittest.TestCase):
         self.assertIs(ui["packet_list"].controls[0], selected_row)
         self.assertEqual(selected_row.bgcolor, theme.ACCENT_SOFT)
         self.assertFalse(ui["packet_list"].auto_scroll)
+        self.assertTrue(ui["packet_details"]["content"].visible)
 
         ui["clear_filter_button"].on_click(None)
         self.assertEqual(ui["packet_capture"].value,
@@ -133,6 +139,40 @@ class PacketViewTests(unittest.TestCase):
                          "0 captured · 0 matching · 0 visible")
         self.assertEqual(ui["packet_details"]["title"].value,
                          "No packet selected")
+        self.assertFalse(ui["packet_details"]["content"].visible)
+
+    def test_alert_area_expands_only_when_needed(self):
+        with patch.object(app, "get_interfaces", return_value=[
+            {"name": "test0", "description": "Test adapter"}
+        ]), patch.object(app, "CaptureController", FakeController), \
+                patch.object(app.ft, "SharedPreferences", FakePreferences):
+            ui = app.main(FakePage())
+
+        panel = ui["alert_panel"]
+        self.assertTrue(panel["empty_text"].visible)
+        self.assertFalse(panel["banner"].visible)
+        self.assertFalse(panel["alert_list"].visible)
+        self.assertFalse(panel["clear_button"].visible)
+
+        ui["start_button"].on_click(None)
+        for number, port in enumerate(range(1000, 1015), start=1):
+            probe = packet(number)
+            probe.tcp_flags = "S"
+            probe.dst_port = str(port)
+            FakeController.instance.packet_callback(probe, object())
+        ui["_flush_pending"]()
+
+        self.assertEqual(panel["alert_count"].value, "1")
+        self.assertTrue(panel["banner"].visible)
+        self.assertTrue(panel["alert_list"].visible)
+        self.assertTrue(panel["clear_button"].visible)
+        self.assertFalse(panel["empty_text"].visible)
+
+        panel["clear_button"].on_click(None)
+        self.assertFalse(panel["banner"].visible)
+        self.assertFalse(panel["alert_list"].visible)
+        self.assertFalse(panel["clear_button"].visible)
+        self.assertTrue(panel["empty_text"].visible)
 
     def test_theme_toggle_restores_preference_without_losing_packets(self):
         FakePreferences.stored = True
@@ -147,6 +187,7 @@ class PacketViewTests(unittest.TestCase):
         self.assertTrue(ui["theme_toggle"].value)
         self.assertEqual(ui["theme_toggle"].label, "Dark Mode")
         FakeController.instance.packet_callback(packet(1), object())
+        ui["_flush_pending"]()
 
         ui["theme_toggle"].value = False
         page.run_task(

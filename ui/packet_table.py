@@ -12,12 +12,12 @@ def create_packet_header():
             spacing=8,
             controls=[
                 _heading("No.", 48),
-                _heading("Time", 82),
-                _heading("Source", 155),
-                _heading("Destination", 155),
-                _heading("Protocol", 90),
-                _heading("Length", 62),
-                _heading("Info", expand=True),
+                _heading("Time", 75),
+                _heading("Source", expand=2),
+                _heading("Destination", expand=2),
+                _heading("Protocol", 80),
+                _heading("Length", 55),
+                _heading("Info", expand=3),
             ],
         ),
     )
@@ -37,7 +37,7 @@ def _heading(label, width=None, expand=False):
 def create_packet_row(packet_info, on_click, selected=False):
     badge_bg, badge_fg = theme.protocol_style(packet_info.protocol)
     row = ft.Container(
-        height=40,
+        height=38,
         bgcolor=theme.SURFACE,
         padding=ft.Padding.symmetric(horizontal=12),
         animate=ft.Animation(theme.MOTION_FAST_MS, ft.AnimationCurve.EASE_OUT_CUBIC),
@@ -46,7 +46,6 @@ def create_packet_row(packet_info, on_click, selected=False):
             "number": packet_info.number,
             "selected": selected,
             "hovered": False,
-            "protocol_color": badge_bg,
         },
         on_click=lambda e: on_click(packet_info),
         content=ft.Row(
@@ -54,11 +53,11 @@ def create_packet_row(packet_info, on_click, selected=False):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 _cell(str(packet_info.number), 48, theme.MUTED),
-                _cell(packet_info.time, 82),
-                _cell(packet_info.source or "—", 155),
-                _cell(packet_info.destination or "—", 155),
+                _cell(packet_info.time, 75),
+                _cell(packet_info.source or "—", expand=2),
+                _cell(packet_info.destination or "—", expand=2),
                 ft.Container(
-                    width=90,
+                    width=80,
                     content=ft.Container(
                         bgcolor=badge_bg,
                         border_radius=4,
@@ -72,8 +71,8 @@ def create_packet_row(packet_info, on_click, selected=False):
                         ),
                     ),
                 ),
-                _cell(str(packet_info.length), 62),
-                _cell(packet_info.info or "—", expand=True),
+                _cell(str(packet_info.length), 55),
+                _cell(packet_info.info or "—", expand=3),
             ],
         ),
     )
@@ -100,9 +99,7 @@ def _paint_row(row):
         theme.ROW_HOVER if row.data["hovered"] else theme.SURFACE
     )
     row.border = ft.Border(
-        left=ft.BorderSide(
-            3, theme.ACCENT if selected else row.data["protocol_color"]
-        ),
+        left=ft.BorderSide(3, theme.ACCENT) if selected else None,
         bottom=ft.BorderSide(1, theme.BORDER),
     )
 

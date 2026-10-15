@@ -3,8 +3,8 @@ import flet as ft
 from security.alert import SecurityAlert, Severity
 from ui import theme
 
-# Background colour per severity. Foreground stays white for contrast in both
-# the light and dark themes.
+# Severity remains visible through a narrow edge and type color; the rows stay
+# quiet enough to scan alongside packet data.
 _SEVERITY_COLORS = {
     Severity.LOW: "#165AA8",
     Severity.MEDIUM: "#B26A00",
@@ -18,25 +18,26 @@ def severity_color(severity: Severity) -> str:
 
 
 def create_alert_row(alert: SecurityAlert):
-    """Render a single security alert as a coloured row."""
+    """Render a security alert as a flat, scannable row."""
     color = severity_color(alert.severity)
     return ft.Container(
-        bgcolor=color,
-        border_radius=6,
+        bgcolor=theme.SURFACE,
+        border=ft.Border(left=ft.BorderSide(3, color),
+                         bottom=ft.BorderSide(1, theme.BORDER)),
         padding=ft.Padding.symmetric(horizontal=10, vertical=8),
         content=ft.Row(
             spacing=8,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Text(alert.timestamp, width=64, size=11,
-                        color=theme.ON_COLOR),
+                        color=theme.MUTED),
                 ft.Text(alert.alert_type, width=96, size=11,
-                        weight=ft.FontWeight.W_600, color=theme.ON_COLOR),
+                        weight=ft.FontWeight.W_600, color=color),
                 ft.Text(alert.source, width=120, size=11,
-                        color=theme.ON_COLOR, no_wrap=True,
+                        color=theme.TEXT, no_wrap=True,
                         overflow=ft.TextOverflow.ELLIPSIS),
                 ft.Text(alert.description, expand=True, size=11,
-                        color=theme.ON_COLOR, no_wrap=True,
+                        color=theme.TEXT, no_wrap=True,
                         overflow=ft.TextOverflow.ELLIPSIS),
             ],
         ),
@@ -57,7 +58,7 @@ def create_alert_panel():
     banner = ft.Container(
         visible=False,
         bgcolor=theme.ERROR,
-        border_radius=8,
+        border_radius=6,
         padding=ft.Padding.symmetric(horizontal=12, vertical=10),
         animate=ft.Animation(
             theme.MOTION_STANDARD_MS, ft.AnimationCurve.EASE_OUT_CUBIC
@@ -79,8 +80,13 @@ def create_alert_panel():
                              visible=False)
 
     clear_alerts_button = ft.Button(
-        "Clear alerts", icon=ft.Icons.CLEANING_SERVICES, elevation=0,
-        disabled=True,
+        "Clear alerts", disabled=True, visible=False,
+        style=ft.ButtonStyle(
+            bgcolor=theme.SURFACE, color=theme.MUTED, elevation=0,
+            side=ft.BorderSide(1, theme.BORDER),
+            shape=ft.RoundedRectangleBorder(radius=6),
+            padding=ft.Padding.symmetric(horizontal=12, vertical=8),
+        ),
     )
 
     header = ft.Row(
@@ -89,11 +95,10 @@ def create_alert_panel():
             ft.Row(
                 spacing=8,
                 controls=[
-                    ft.Icon(ft.Icons.SHIELD_OUTLINED, size=18,
-                            color=theme.TEXT),
-                    ft.Text("Security alerts", size=16,
+                    ft.Text("Security alerts", size=14,
                             weight=ft.FontWeight.W_600, color=theme.TEXT),
                     alert_count,
+                    empty_text,
                 ],
             ),
             clear_alerts_button,
@@ -101,8 +106,8 @@ def create_alert_panel():
     )
 
     content = ft.Column(
-        spacing=10,
-        controls=[banner, header, empty_text, alert_list],
+        spacing=8,
+        controls=[header, banner, alert_list],
     )
 
     return {
