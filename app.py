@@ -1,9 +1,14 @@
+import asyncio
+from collections import deque
+
 import flet as ft
 
 from capture.controller import CaptureController
 from capture.interfaces import get_interfaces
 from exporters import CSVExporter, PCAPExporter
+from security import SecurityEngine
 from ui import theme
+from ui.alert_panel import create_alert_row, severity_color
 from ui.main_view import create_main_view
 from ui.packet_table import create_packet_row, set_packet_row_selected
 from utils.packet_filter import matches_filter
@@ -12,6 +17,7 @@ from utils.packet_view import packet_view
 
 MAX_DISPLAY_PACKETS = 500
 THEME_PREFERENCE_KEY = "sniffer.ui.dark_mode"
+FLUSH_INTERVAL = 0.15
 
 
 def main(page: ft.Page):
@@ -32,6 +38,8 @@ def main(page: ft.Page):
     matching_count = 0
     selected_packet_number = None
     theme_touched = False
+    pending_packets = deque()
+    pending_alerts = deque()
 
     def set_status(label, message, kind="neutral"):
         styles = {
@@ -148,24 +156,61 @@ def main(page: ft.Page):
             set_packet_row_selected(row, row.data["number"] == selected_packet_number)
         page.update()
 
-    async def add_packet_to_table(packet_info, raw_packet):
-        nonlocal matching_count
-        capture_packets.append(packet_info)
-        raw_packets.append(raw_packet)
+    def render_alert(alert):
+        panel = ui["alert_panel"]
+        panel["banner"].visible = True
+        panel["banner"].bgcolor = severity_color(alert.severity)
+        panel["banner_text"].value = (
+            f"{alert.alert_type} detected — {alert.description} "
+            f"(source {alert.source})"
+        )
+        panel["alert_list"].visible = True
+        panel["alert_list"].controls.append(create_alert_row(alert))
+        panel["alert_count"].value = str(len(security_engine.alerts))
+        panel["empty_text"].visible = False
+        panel["clear_button"].disabled = False
 
-        if matches_filter(packet_info, active_filter):
-            matching_count += 1
-            if len(ui["packet_list"].controls) >= MAX_DISPLAY_PACKETS:
-                ui["packet_list"].controls.pop(0)
-            ui["packet_list"].controls.append(
-                create_packet_row(packet_info, show_packet_details,
-                                  selected=packet_info.number == selected_packet_number)
-            )
+    def process_pending():
+        """Drain queued packets/alerts and redraw the UI once.
+
+        Runs on the UI thread only. The capture thread never touches Flet
+        controls; it just appends to these thread-safe queues.
+        """
+        nonlocal matching_count
+        if not pending_packets and not pending_alerts:
+            return
+
+        while pending_packets:
+            packet_info, raw_packet = pending_packets.popleft()
+            capture_packets.append(packet_info)
+            raw_packets.append(raw_packet)
+            if matches_filter(packet_info, active_filter):
+                matching_count += 1
+                if len(ui["packet_list"].controls) >= MAX_DISPLAY_PACKETS:
+                    ui["packet_list"].controls.pop(0)
+                ui["packet_list"].controls.append(
+                    create_packet_row(
+                        packet_info,
+                        show_packet_details,
+                        selected=packet_info.number == selected_packet_number,
+                    )
+                )
+
+        while pending_alerts:
+            render_alert(pending_alerts.popleft())
 
         update_empty_state()
         update_counts()
         update_actions()
         page.update()
+
+    async def ui_flush_loop():
+        while True:
+            await asyncio.sleep(FLUSH_INTERVAL)
+            try:
+                process_pending()
+            except Exception as error:
+                print(f"UI flush error: {error}")
 
     def apply_display_filter(e=None):
         nonlocal active_filter, matching_count
@@ -248,8 +293,31 @@ def main(page: ft.Page):
                 actions=[ft.TextButton("OK", on_click=lambda _: page.pop_dialog())],
             ))
 
+    def reset_alert_panel():
+        panel = ui["alert_panel"]
+        panel["banner"].visible = False
+        panel["alert_list"].controls.clear()
+        panel["alert_list"].visible = False
+        panel["alert_count"].value = "0"
+        panel["empty_text"].visible = True
+        panel["clear_button"].disabled = True
+
+    def security_alert_received(alert):
+        print(
+            f"[SECURITY ALERT] {alert.alert_type} from {alert.source}: "
+            f"{alert.description}"
+        )
+        pending_alerts.append(alert)
+
+    def clear_alerts(e=None):
+        security_engine.reset()
+        pending_alerts.clear()
+        reset_alert_panel()
+        page.update()
+
     def packet_received(packet_info, raw_packet):
-        page.run_task(add_packet_to_table, packet_info, raw_packet)
+        security_engine.inspect(packet_info)
+        pending_packets.append((packet_info, raw_packet))
 
     async def show_capture_error(error):
         set_status("Capture error", str(error), "error")
@@ -272,6 +340,10 @@ def main(page: ft.Page):
             controller.start(interface, bpf_filter=bpf_filter)
             if not controller.is_running:
                 raise RuntimeError("Capture could not start. Check Npcap and permissions.")
+            security_engine.reset()
+            pending_packets.clear()
+            pending_alerts.clear()
+            reset_alert_panel()
             set_status("Capturing", f"Listening on {interface}", "live")
         except Exception as error:
             set_status("Capture error", str(error), "error")
@@ -288,6 +360,7 @@ def main(page: ft.Page):
         page.update()
 
     controller = CaptureController(packet_received, capture_error)
+    security_engine = SecurityEngine(alert_callback=security_alert_received)
     ui = create_main_view(
         interfaces, start_capture, stop_capture, toggle_theme
     )
@@ -297,8 +370,10 @@ def main(page: ft.Page):
     ui["follow_live_button"].on_click = follow_live
     ui["clear_button"].on_click = clear_packets
     ui["export_button"].on_click = export_packets
+    ui["alert_panel"]["clear_button"].on_click = clear_alerts
     page.add(ui["view"])
     page.run_task(restore_theme)
+    page.run_task(ui_flush_loop)
     return ui
 
 

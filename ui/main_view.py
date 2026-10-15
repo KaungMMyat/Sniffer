@@ -1,6 +1,7 @@
 import flet as ft
 
 from ui import theme
+from ui.alert_panel import create_alert_panel
 from ui.packet_details import create_packet_details
 from ui.packet_table import create_packet_header
 
@@ -140,6 +141,7 @@ def create_main_view(interfaces, start_capture, stop_capture, toggle_theme=None)
                              disabled=True, elevation=0)
     follow_live_button = ft.Button("Follow live", disabled=True, elevation=0)
     packet_details = create_packet_details()
+    alert_panel = create_alert_panel()
 
     layout = ft.Column(
         expand=True,
@@ -167,6 +169,7 @@ def create_main_view(interfaces, start_capture, stop_capture, toggle_theme=None)
                 ]),
                 status_message,
             ])),
+            _panel(alert_panel["content"]),
             _panel(ft.Column(spacing=8, controls=[
                 ft.Row(spacing=10, controls=[
                     filter_field, apply_filter_button, clear_filter_button,
@@ -241,6 +244,7 @@ def create_main_view(interfaces, start_capture, stop_capture, toggle_theme=None)
         "empty_title": empty_title,
         "empty_description": empty_description,
         "packet_details": packet_details,
+        "alert_panel": alert_panel,
         "export_format_dropdown": export_format_dropdown,
         "export_button": export_button,
         "clear_button": clear_button,

@@ -18,6 +18,7 @@ def parse_packet(packet, number):
 
     src_port = ""
     dst_port = ""
+    tcp_flags = ""
 
     protocol = packet.lastlayer().name
     info = ""
@@ -67,6 +68,7 @@ def parse_packet(packet, number):
     if packet.haslayer(TCP):
         src_port = str(packet[TCP].sport)
         dst_port = str(packet[TCP].dport)
+        tcp_flags = str(packet[TCP].flags)
 
         protocol = "TCP"
 
@@ -112,5 +114,6 @@ def parse_packet(packet, number):
         mac_destination=mac_destination,
         src_port=src_port,
         dst_port=dst_port,
+        tcp_flags=tcp_flags,
         info=info,
     )

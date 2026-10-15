@@ -26,4 +26,6 @@ class PacketInfo:
 
     dst_port: str = ""
 
+    tcp_flags: str = ""
+
     info: str = ""
