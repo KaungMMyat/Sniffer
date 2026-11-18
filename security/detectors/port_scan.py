@@ -1,9 +1,9 @@
 import time
-from collections import defaultdict
-from typing import Dict, Optional
+from collections import defaultdict, deque
+from typing import Deque, Dict, Optional, Tuple
 
 from models.packet_info import PacketInfo
-from security.alert import SecurityAlert, Severity
+from security.alert import MAX_EVIDENCE_PACKETS, SecurityAlert, Severity
 from security.detectors.base import BaseDetector
 
 
@@ -35,6 +35,10 @@ class PortScanDetector(BaseDetector):
 
         # source_ip -> {destination_port: last_seen_timestamp}
         self._attempts: Dict[str, Dict[str, float]] = defaultdict(dict)
+        # source_ip -> (arrival time, packet) inside the window
+        self._packets: Dict[str, Deque[Tuple[float, PacketInfo]]] = (
+            defaultdict(deque)
+        )
         # source_ip -> timestamp of last alert
         self._last_alert: Dict[str, float] = {}
 
@@ -47,7 +51,7 @@ class PortScanDetector(BaseDetector):
         source = packet_info.source
         destination_port = packet_info.dst_port
 
-        now = time.time()
+        now = packet_info.timestamp or time.time()
         ports = self._attempts[source]
 
         # Drop ports not seen within the window so the count reflects rate.
@@ -57,6 +61,13 @@ class PortScanDetector(BaseDetector):
                 del ports[port]
 
         ports[destination_port] = now
+
+        # Keep the same packets the port counts refer to, so the alert can
+        # show exactly what the scan looked like.
+        packets = self._packets[source]
+        packets.append((now, packet_info))
+        while packets and packets[0][0] < cutoff:
+            packets.popleft()
 
         if len(ports) < self.port_threshold:
             return None
@@ -75,12 +86,16 @@ class PortScanDetector(BaseDetector):
                 f"{len(ports)} distinct ports probed within "
                 f"{self.time_window:.0f}s"
             ),
+            evidence=[
+                packet for _, packet in list(packets)[-MAX_EVIDENCE_PACKETS:]
+            ],
         )
 
     # ------------------------------------------------------------------
 
     def reset(self) -> None:
         self._attempts.clear()
+        self._packets.clear()
         self._last_alert.clear()
 
     # ------------------------------------------------------------------

@@ -3,6 +3,7 @@ from typing import Callable, List, Optional
 from models.packet_info import PacketInfo
 from security.alert import SecurityAlert
 from security.detectors.base import BaseDetector
+from security.detectors.icmp_flood import IcmpFloodDetector
 from security.detectors.port_scan import PortScanDetector
 
 
@@ -21,7 +22,9 @@ class SecurityEngine:
     ):
         self.alert_callback = alert_callback
         self.detectors: List[BaseDetector] = (
-            detectors if detectors is not None else [PortScanDetector()]
+            detectors
+            if detectors is not None
+            else [PortScanDetector(), IcmpFloodDetector()]
         )
         self.alerts: List[SecurityAlert] = []
 

@@ -18,6 +18,9 @@ class PacketInfo:
 
     length: int
 
+    # Application protocol recognised inside TCP/UDP (HTTP, TLS, ...).
+    app_protocol: str = ""
+
     mac_source: str = ""
 
     mac_destination: str = ""
@@ -28,4 +31,16 @@ class PacketInfo:
 
     tcp_flags: str = ""
 
+    # ICMP type (8 = echo request, 0 = echo reply); -1 when not ICMP.
+    icmp_type: int = -1
+
     info: str = ""
+
+    # Epoch time from the capture itself. Detectors use it so a file loaded
+    # from disk is analysed against its own timeline instead of load time.
+    timestamp: float = 0.0
+
+    @property
+    def display_protocol(self):
+        """Application name when known, otherwise the transport/network name."""
+        return self.app_protocol or self.protocol

@@ -1,5 +1,6 @@
 from typing import List, Any
 
+from scapy.data import DLT_EN10MB
 from scapy.all import wrpcap
 
 from exporters.base import BaseExporter
@@ -17,7 +18,7 @@ class PCAPExporter(BaseExporter):
         Export packets to a PCAP file.
         
         Args:
-            packets: List of raw Scapy packet objects to export
+            packets: Raw link-layer frame bytes (or Scapy packets) to export
             file_path: Path where the PCAP file should be saved
             
         Returns:
@@ -30,7 +31,9 @@ class PCAPExporter(BaseExporter):
         if not packets:
             raise ValueError("No packets available to export.")
         
-        wrpcap(file_path, packets)
+        # The app stores Ethernet frame bytes (DLT 1) to keep memory low;
+        # Scapy cannot guess the link type from bytes, so pass it explicitly.
+        wrpcap(file_path, packets, linktype=DLT_EN10MB)
         
         return len(packets)
     

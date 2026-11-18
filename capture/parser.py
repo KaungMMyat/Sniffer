@@ -1,14 +1,25 @@
+import time
 from datetime import datetime
 
-from scapy.layers.dns import DNS
 from scapy.layers.inet import ICMP, IP, TCP, UDP
 from scapy.layers.inet6 import IPv6
 from scapy.layers.l2 import ARP, Ether
 
+from capture.protocols import detect_application
 from models.packet_info import PacketInfo
 
+_ICMP_LABELS = {
+    0: "Echo reply",
+    3: "Destination unreachable",
+    5: "Redirect",
+    8: "Echo request",
+    11: "Time exceeded",
+}
 
-def parse_packet(packet, number):
+
+def parse_packet(packet, number, timestamp=None):
+
+    captured_at = timestamp if timestamp is not None else time.time()
 
     source = ""
     destination = ""
@@ -19,8 +30,10 @@ def parse_packet(packet, number):
     src_port = ""
     dst_port = ""
     tcp_flags = ""
+    icmp_type = -1
 
     protocol = packet.lastlayer().name
+    app_protocol = ""
     info = ""
 
     # -------------------------
@@ -92,28 +105,39 @@ def parse_packet(packet, number):
 
     elif packet.haslayer(ICMP):
         protocol = "ICMP"
+        icmp_type = int(packet[ICMP].type)
+        info = _ICMP_LABELS.get(icmp_type, f"Type {icmp_type}")
 
     # -------------------------
-    # DNS
+    # Application layer
     # -------------------------
 
-    if packet.haslayer(DNS):
-        protocol = "DNS"
-
-        if packet[DNS].qd:
-            info = packet[DNS].qd.qname.decode(errors="ignore")
+    app_protocol, app_info = detect_application(
+        packet, protocol, src_port, dst_port
+    )
+    if app_protocol:
+        if app_info:
+            info = app_info
+        elif protocol in ("TCP", "UDP"):
+            info = (
+                f"{app_protocol} · {src_port} → {dst_port}"
+                if src_port else app_protocol
+            )
 
     return PacketInfo(
         number=number,
-        time=datetime.now().strftime("%H:%M:%S"),
+        time=datetime.fromtimestamp(captured_at).strftime("%H:%M:%S"),
+        timestamp=captured_at,
         source=source,
         destination=destination,
         protocol=protocol,
+        app_protocol=app_protocol,
         length=len(packet),
         mac_source=mac_source,
         mac_destination=mac_destination,
         src_port=src_port,
         dst_port=dst_port,
         tcp_flags=tcp_flags,
+        icmp_type=icmp_type,
         info=info,
     )

@@ -7,7 +7,7 @@ def _detail(label, value):
     return ft.Row(
         spacing=8,
         controls=[
-            ft.Text(label, width=112, size=12, color=theme.MUTED),
+            ft.Text(label, width=104, size=11, color=theme.MUTED),
             value,
         ],
     )
@@ -15,10 +15,11 @@ def _detail(label, value):
 
 def create_packet_details():
     fields = {
-        name: ft.Text("—", size=12, color=theme.TEXT, selectable=True)
+        name: ft.Text("—", size=11, color=theme.TEXT, selectable=True)
         for name in (
-            "protocol", "source", "destination", "src_port", "dst_port",
-            "mac_source", "mac_destination", "length", "info",
+            "protocol", "transport", "source", "destination",
+            "src_port", "dst_port", "mac_source", "mac_destination",
+            "length", "info",
         )
     }
     title = ft.Text("No packet selected", size=14, weight=ft.FontWeight.W_600,
@@ -27,16 +28,19 @@ def create_packet_details():
                     size=12, color=theme.MUTED)
     content = ft.Column(
         visible=False,
-        spacing=8,
+        spacing=6,
+        expand=True,
+        scroll=ft.ScrollMode.AUTO,
         controls=[
             ft.Row(
                 spacing=24,
                 controls=[
                     ft.Column(
                         expand=True,
-                        spacing=6,
+                        spacing=4,
                         controls=[
                             _detail("Protocol", fields["protocol"]),
+                            _detail("Transport", fields["transport"]),
                             _detail("Source", fields["source"]),
                             _detail("Destination", fields["destination"]),
                             _detail("Length", fields["length"]),
@@ -44,7 +48,7 @@ def create_packet_details():
                     ),
                     ft.Column(
                         expand=True,
-                        spacing=6,
+                        spacing=4,
                         controls=[
                             _detail("Source port", fields["src_port"]),
                             _detail("Destination port", fields["dst_port"]),
@@ -59,21 +63,21 @@ def create_packet_details():
     )
 
     view = ft.Container(
+        # Lives in a Row beside the evidence panel; expand shares the width.
+        expand=1,
         bgcolor=theme.GLASS_SURFACE,
         blur=10,
         border=ft.Border.all(1, theme.GLASS_BORDER),
-        border_radius=12,
-        padding=16,
-        animate_size=ft.Animation(
-            theme.MOTION_STANDARD_MS, ft.AnimationCurve.EASE_OUT_CUBIC
-        ),
+        border_radius=10,
+        padding=10,
         shadow=ft.BoxShadow(
             blur_radius=18,
             color="#1A163655",
             offset=ft.Offset(0, 5),
         ),
         content=ft.Column(
-            spacing=12,
+            spacing=8,
+            expand=True,
             controls=[title, empty, content],
         ),
     )

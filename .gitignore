@@ -16,3 +16,6 @@ Python/
 test_packets.csv
 test_export.csv
 test_export.pcap
+
+# Recorded capture files
+captures/

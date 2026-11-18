@@ -34,6 +34,20 @@ PROTOCOL_STYLES = {
     "ARP": ("#3C6273", SURFACE),
     "IPv4": ("#42566D", SURFACE),
     "IPv6": ("#42566D", SURFACE),
+    "HTTP": ("#0F766E", SURFACE),
+    "TLS": ("#166B53", SURFACE),
+    "SSH": ("#8A3B6B", SURFACE),
+    "DHCP": ("#9A5B00", SURFACE),
+    "QUIC": ("#0E7490", SURFACE),
+    "FTP": ("#2F6B9A", SURFACE),
+    "SMTP": ("#8A6A00", SURFACE),
+    "Telnet": ("#5A5A5A", SURFACE),
+    "SMB": ("#6B4A2F", SURFACE),
+    "MySQL": ("#9A5B00", SURFACE),
+    "RDP": ("#1B5DB2", SURFACE),
+    "PostgreSQL": ("#2F6B9A", SURFACE),
+    "NTP": ("#0B7055", SURFACE),
+    "SNMP": ("#3C6273", SURFACE),
 }
 
 

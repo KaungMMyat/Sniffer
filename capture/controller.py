@@ -43,6 +43,14 @@ class CaptureController:
 
     # -------------------------------------------------------
 
+    def stats(self):
+        """Return ``(received, dropped)`` from libpcap, or ``None``."""
+        if self.sniffer:
+            return self.sniffer.stats()
+        return None
+
+    # -------------------------------------------------------
+
     def packet_received(self, packet):
 
         self.packet_count += 1
