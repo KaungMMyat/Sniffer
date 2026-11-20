@@ -1,5 +1,6 @@
 from capture.parser import parse_packet
 from capture.sniffer import PacketSniffer
+from capture.tcp_analysis import TCPAnalyzer
 
 
 class CaptureController:
@@ -10,6 +11,7 @@ class CaptureController:
 
         self.sniffer = None
         self.packet_count = 0
+        self.tcp_analyzer = TCPAnalyzer()
 
     # -------------------------------------------------------
 
@@ -25,6 +27,7 @@ class CaptureController:
             bpf_filter,
         )
 
+        self.tcp_analyzer.reset()
         self.sniffer.start()
 
     # -------------------------------------------------------
@@ -55,7 +58,9 @@ class CaptureController:
 
         self.packet_count += 1
 
-        packet_info = parse_packet(packet, self.packet_count)
+        packet_info = parse_packet(
+            packet, self.packet_count, analyzer=self.tcp_analyzer
+        )
 
         self.packet_callback(packet_info, packet)
 

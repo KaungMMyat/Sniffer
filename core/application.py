@@ -23,6 +23,7 @@ from ui import theme
 from ui.alert_panel import create_alert_row, severity_color
 from ui.evidence_panel import create_evidence_header_row, create_evidence_row
 from ui.main_view import create_main_view
+from ui.packet_details import render_packet_details
 from ui.packet_table import (
     ZOOM_LEVELS,
     apply_header_zoom,
@@ -102,7 +103,7 @@ class SnifferApplication:
 
     def _configure_page(self):
         page = self.page
-        page.title = "Packet Sniffer"
+        page.title = "sniffX"
         page.window.width = 1280
         # Kept below the smallest common screen height after DPI scaling so
         # the details pane is never pushed under the taskbar.
@@ -304,10 +305,7 @@ class SnifferApplication:
 
     def _clear_selection(self):
         self.selected_packet_number = None
-        details = self.ui["packet_details"]
-        details["title"].value = "No packet selected"
-        details["empty"].visible = True
-        details["content"].visible = False
+        render_packet_details(self.ui["packet_details"], None)
 
     def _render_packet_list(self, packets):
         self.ui["packet_list"].controls = [
@@ -324,19 +322,7 @@ class SnifferApplication:
 
     def _show_packet_details(self, packet_info):
         self.selected_packet_number = packet_info.number
-        details = self.ui["packet_details"]
-        details["title"].value = f"Selected packet #{packet_info.number}"
-        details["empty"].visible = False
-        details["content"].visible = True
-        details["protocol"].value = packet_info.display_protocol or "—"
-        details["transport"].value = (
-            packet_info.protocol if packet_info.app_protocol else "—"
-        )
-        for field in (
-            "source", "destination", "src_port", "dst_port",
-            "mac_source", "mac_destination", "length", "info",
-        ):
-            details[field].value = str(getattr(packet_info, field) or "—")
+        render_packet_details(self.ui["packet_details"], packet_info)
 
         # Keep the selected row in view while the capture continues.
         self.ui["packet_list"].auto_scroll = False
@@ -362,13 +348,8 @@ class SnifferApplication:
         new_matching = []
         for packet_info, raw_packet in self.store.drain_packets():
             self.store.packets.append(packet_info)
-            # Keep the original wire frame only. Retaining the dissected Scapy
-            # object costs ~8 KB and ~100 Python objects per packet, which made
-            # multi-second GC pauses inevitable on long captures.
-            frame = getattr(raw_packet, "original", None)
-            if frame is None:
-                frame = bytes(raw_packet)
-            self.store.raw_packets.append(frame)
+            # Share the same bytes with packet details rather than retaining Scapy objects.
+            self.store.raw_packets.append(packet_info.raw_frame)
             if matches_filter(packet_info, self.active_filter):
                 self.matching_count += 1
                 new_matching.append(packet_info)

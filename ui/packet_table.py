@@ -187,7 +187,9 @@ def _paint_row(row):
     selected = row.data["selected"]
     row.bgcolor = (
         theme.ACCENT_SOFT if selected else
-        theme.ROW_HOVER if row.data["hovered"] else theme.SURFACE
+        theme.protocol_row_background(
+            row.data["packet"].display_protocol, row.data["hovered"]
+        )
     )
     row.border = ft.Border(
         left=ft.BorderSide(

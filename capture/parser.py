@@ -1,11 +1,13 @@
 import time
 from datetime import datetime
 
+from scapy.config import conf
 from scapy.layers.inet import ICMP, IP, TCP, UDP
 from scapy.layers.inet6 import IPv6
 from scapy.layers.l2 import ARP, Ether
 
 from capture.protocols import detect_application
+from capture.tcp_analysis import tcp_payload_length, tcp_summary
 from models.packet_info import PacketInfo
 
 _ICMP_LABELS = {
@@ -17,9 +19,12 @@ _ICMP_LABELS = {
 }
 
 
-def parse_packet(packet, number, timestamp=None):
+def parse_packet(packet, number, timestamp=None, analyzer=None):
 
-    captured_at = timestamp if timestamp is not None else time.time()
+    captured_at = timestamp if timestamp is not None else float(
+        getattr(packet, "time", time.time())
+    )
+    frame = getattr(packet, "original", b"") or bytes(packet)
 
     source = ""
     destination = ""
@@ -73,6 +78,9 @@ def parse_packet(packet, number, timestamp=None):
         destination = packet[ARP].pdst
 
         protocol = "ARP"
+        arp = packet[ARP]
+        info = (f"Who has {arp.pdst}? Tell {arp.psrc}" if arp.op == 1 else
+                f"{arp.psrc} is at {arp.hwsrc}" if arp.op == 2 else f"ARP operation {arp.op}")
 
     # -------------------------
     # TCP
@@ -85,7 +93,7 @@ def parse_packet(packet, number, timestamp=None):
 
         protocol = "TCP"
 
-        info = f"{src_port} → {dst_port}"
+        info = tcp_summary(packet[TCP])
 
     # -------------------------
     # UDP
@@ -97,7 +105,7 @@ def parse_packet(packet, number, timestamp=None):
 
         protocol = "UDP"
 
-        info = f"{src_port} → {dst_port}"
+        info = f"{src_port} → {dst_port} Len={len(packet[UDP].payload)}"
 
     # -------------------------
     # ICMP
@@ -112,19 +120,14 @@ def parse_packet(packet, number, timestamp=None):
     # Application layer
     # -------------------------
 
-    app_protocol, app_info = detect_application(
-        packet, protocol, src_port, dst_port
-    )
-    if app_protocol:
-        if app_info:
-            info = app_info
-        elif protocol in ("TCP", "UDP"):
-            info = (
-                f"{app_protocol} · {src_port} → {dst_port}"
-                if src_port else app_protocol
-            )
+    if protocol != "TCP" or tcp_payload_length(packet[TCP]):
+        app_protocol, app_info = detect_application(
+            packet, protocol, src_port, dst_port
+        )
+        if app_protocol:
+            info = f"{info} · {app_info or app_protocol}"
 
-    return PacketInfo(
+    result = PacketInfo(
         number=number,
         time=datetime.fromtimestamp(captured_at).strftime("%H:%M:%S"),
         timestamp=captured_at,
@@ -132,7 +135,10 @@ def parse_packet(packet, number, timestamp=None):
         destination=destination,
         protocol=protocol,
         app_protocol=app_protocol,
-        length=len(packet),
+        length=len(frame),
+        raw_frame=frame,
+        link_type=conf.l2types.layer2num.get(type(packet)),
+        wire_length=int(getattr(packet, "wirelen", None) or len(frame)),
         mac_source=mac_source,
         mac_destination=mac_destination,
         src_port=src_port,
@@ -141,3 +147,6 @@ def parse_packet(packet, number, timestamp=None):
         icmp_type=icmp_type,
         info=info,
     )
+    if analyzer is not None:
+        analyzer.analyze(result, packet)
+    return result

@@ -5,6 +5,7 @@ import time
 from scapy.utils import PcapNgReader, PcapReader
 
 from capture.parser import parse_packet
+from capture.tcp_analysis import TCPAnalyzer
 
 PCAPNG_MAGIC = b"\x0a\x0d\x0d\x0a"
 SUPPORTED_SUFFIXES = (".pcap", ".pcapng", ".cap")
@@ -31,6 +32,7 @@ def read_capture(path, on_packet, should_pause=None):
     reader_class = PcapNgReader if _is_pcapng(path) else PcapReader
     loaded = 0
     skipped = 0
+    analyzer = TCPAnalyzer()
 
     with reader_class(str(path)) as reader:
         for packet in reader:
@@ -40,7 +42,9 @@ def read_capture(path, on_packet, should_pause=None):
                 captured_at = time.time()
 
             try:
-                packet_info = parse_packet(packet, loaded + 1, captured_at)
+                packet_info = parse_packet(
+                    packet, loaded + 1, captured_at, analyzer=analyzer
+                )
             except Exception:
                 skipped += 1
                 continue

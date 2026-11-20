@@ -35,7 +35,8 @@ def create_main_view(
         controls=[
             ft.Row(alignment=ft.MainAxisAlignment.END,
                    controls=[setup_theme_toggle]),
-            ft.Container(expand=True, content=start["setup_page"]),
+            ft.Container(expand=True, alignment=ft.Alignment.CENTER,
+                         content=start["setup_page"]),
         ],
     )
 

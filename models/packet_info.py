@@ -1,7 +1,7 @@
 # Packet ရောက်ပြီဆို raw packet object ရမယ် ၊ အဲ့ဒါကို parser က convert လုပ်ပေးပြီး ၊ flet GUI မှာထည့်မယ်
 # ဘာလို့ scapy ကနေ GUI ပေါ်ကိုတန်းမတင်လဲဆိုရင် ၊ နောက်ပိုင်း scapy အစား PyShark တို့ dpkt တို့ပြောင်းသုံးရင် UI break သွားမှာစိုးလို့
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -39,6 +39,12 @@ class PacketInfo:
     # Epoch time from the capture itself. Detectors use it so a file loaded
     # from disk is analysed against its own timeline instead of load time.
     timestamp: float = 0.0
+
+    raw_frame: bytes = field(default=b"", repr=False)
+    link_type: int | None = None
+    wire_length: int = 0
+    tcp_stream: int | None = None
+    tcp_analysis: tuple[str, ...] = ()
 
     @property
     def display_protocol(self):

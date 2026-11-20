@@ -302,6 +302,18 @@ def _dhcp_info(packet):
 
 
 def _dns_info(packet):
-    if packet.haslayer(DNS) and packet[DNS].qd:
-        return packet[DNS].qd.qname.decode("utf-8", errors="ignore").rstrip(".")
-    return "DNS"
+    if not packet.haslayer(DNS):
+        return "DNS"
+    dns = packet[DNS]
+    label = "Standard query response" if dns.qr else "Standard query"
+    summary = f"{label} 0x{dns.id:04x}"
+    if dns.qd:
+        question = dns.qd[0]
+        kind = question.get_field("qtype").i2repr(question, question.qtype)
+        name = question.qname.decode("utf-8", errors="replace").rstrip(".")
+        summary += f" {kind} {name}"
+    if dns.qr:
+        summary += f" · {len(dns.an)} answer(s)"
+        if dns.rcode:
+            summary += f" · {dns.get_field('rcode').i2repr(dns, dns.rcode)}"
+    return summary

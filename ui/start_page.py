@@ -18,7 +18,10 @@ def create_start_page(interfaces, selected_interface, on_select_interface):
     ]
 
     if interfaces:
-        interface_list = ft.Column(spacing=6, controls=interface_rows)
+        interface_list = ft.ListView(
+            spacing=4, height=min(len(interfaces) * 58 - 4, 228),
+            controls=interface_rows,
+        )
     else:
         interface_list = ft.Container(
             padding=ft.Padding.symmetric(horizontal=4, vertical=8),
@@ -70,8 +73,8 @@ def create_start_page(interfaces, selected_interface, on_select_interface):
     capture_card = create_panel(ft.Column(spacing=14, controls=[
         _card_header(
             ft.Icons.WIFI_TETHERING,
-            "Capture",
-            "Choose a network interface to listen on.",
+            "Capture interfaces",
+            "Select an interface, then start capturing live traffic.",
         ),
         interface_list,
         ft.Row(
@@ -103,58 +106,40 @@ def create_start_page(interfaces, selected_interface, on_select_interface):
         setup_error,
     ]))
     capture_card.expand = False
-    capture_card.width = 660
+    capture_card.width = 840
     capture_card.padding = 16
 
-    setup_open_button = ft.Button(
-        "Open capture file",
-        icon=ft.Icons.FOLDER_OPEN,
-        width=210,
-        elevation=0,
+    setup_open_button = ft.OutlinedButton(
+        "Open file…",
+        icon=ft.Icons.FOLDER_OPEN_OUTLINED,
+        width=160,
+        height=36,
+        tooltip="Open a saved capture; replaces the packets currently in the table.",
     )
-    files_card = create_panel(ft.Column(spacing=14, controls=[
-        _card_header(
-            ft.Icons.FOLDER_OPEN,
-            "Open a capture file",
-            "Analyse traffic that was saved earlier.",
-        ),
-        ft.Container(
-            alignment=ft.Alignment.CENTER,
-            height=72,
-            content=ft.Icon(
-                ft.Icons.INSERT_DRIVE_FILE, size=40, color=theme.MUTED
-            ),
-        ),
-        ft.Text(
-            "Load a .pcap, .pcapng or .cap file recorded by this app, "
-            "Wireshark or tcpdump. The same parsers and security detectors "
-            "run on every packet in the file.",
-            size=11,
-            color=theme.MUTED,
-        ),
-        setup_open_button,
-        ft.Text(
-            "Opening a file replaces the packets currently in the table.",
-            size=10,
-            color=theme.MUTED,
-        ),
-    ]))
-    files_card.expand = False
-    files_card.width = 340
-    files_card.padding = 16
+    files_card = create_panel(ft.Row(
+        spacing=12,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        controls=[
+            ft.Icon(ft.Icons.INSERT_DRIVE_FILE_OUTLINED, size=24, color=theme.ACCENT),
+            ft.Column(expand=True, spacing=3, controls=[
+                ft.Text("Open a capture file", size=14,
+                        weight=ft.FontWeight.W_600, color=theme.TEXT),
+                ft.Text("Inspect saved traffic · .pcap / .pcapng / .cap",
+                        size=11, color=theme.MUTED),
+            ]),
+            setup_open_button,
+        ],
+    ), glass=False)
+    files_card.width = 840
+    files_card.padding = ft.Padding.symmetric(horizontal=16, vertical=12)
 
     setup_page = ft.Column(
         expand=True,
+        spacing=12,
+        scroll=ft.ScrollMode.AUTO,
         alignment=ft.MainAxisAlignment.CENTER,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        controls=[
-            ft.Row(
-                alignment=ft.MainAxisAlignment.CENTER,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=16,
-                controls=[capture_card, files_card],
-            )
-        ],
+        controls=[files_card, capture_card],
     )
 
     return {
